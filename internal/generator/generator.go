@@ -15,9 +15,11 @@ func GeneratePipeline(info *analyzer.ProjectInfo, outputFile string) error {
 		pipelineContent = generateGoPipelineActions(info)
 	case "python":
 		pipelineContent = generatePythonPipeline(info)
+	case "java_gradle", "java_maven":
+		pipelineContent = generateJavaPipeline(info)
 	default:
 		return fmt.Errorf("unsupported language: %s", info.Language)
 	}
-
+	fmt.Println(info)
 	return os.WriteFile(outputFile, []byte(pipelineContent), 0644)
 }

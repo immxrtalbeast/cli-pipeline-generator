@@ -37,14 +37,21 @@ func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {
 	// Определяем язык проекта
 	info.Language = detectLanguageFromMemory(remoteInfo)
 
-	// Для Go проектов
 	if info.Language == "go" {
 		analyzeGoProjectFromMemory(remoteInfo, info)
 		info.Architecture = detectGoArchitectureFromMemory(remoteInfo)
-
 	}
 
-	// Проверяем дополнительные файлы
+	switch info.Language {
+	case "go":
+		analyzeGoProjectFromMemory(remoteInfo, info)
+		info.Architecture = detectGoArchitectureFromMemory(remoteInfo)
+	case "python":
+		analyzePythonProjectFromMemory(remoteInfo, info)
+	case "java_gradle", "java_maven":
+		analyzeJavaProjectFromMemory(remoteInfo, info)
+
+	}
 	info.HasDockerfile = remoteInfo.HasFile("Dockerfile")
 	info.HasMakefile = remoteInfo.HasFile("Makefile")
 
@@ -64,11 +71,13 @@ func detectLanguageFromMemory(remoteInfo *git.RemoteRepoInfo) string {
 	if remoteInfo.HasFile("Cargo.toml") {
 		return "rust"
 	}
-	if remoteInfo.HasFile("pom.xml") || remoteInfo.HasFile("build.gradle") {
-		return "java"
-	}
 
-	// Анализируем расширения файлов
+	if remoteInfo.HasFile("build.gradle") || remoteInfo.HasFile("build.gradle.kts") {
+		return "java_gradle"
+	}
+	if remoteInfo.HasFile("pom.xml") {
+		return "java_maven"
+	}
 	return detectLanguageByExtensions(remoteInfo.Structure)
 }
 func detectLanguageByExtensions(fileList []string) string {
@@ -120,15 +129,14 @@ func AnalyzeLocalRepo(repoPath string) (*ProjectInfo, error) {
 	}
 	info.Language = lang
 
-	if lang == "go" {
-		err = analyzeGoProject(repoPath, info)
-		if err != nil {
-			return nil, err
-		}
-	}
 	switch lang {
 	case "python":
 		err = analyzePythonProject(repoPath, info)
+		if err != nil {
+			return nil, err
+		}
+	case "go":
+		err = analyzeGoProject(repoPath, info)
 		if err != nil {
 			return nil, err
 		}
@@ -144,9 +152,12 @@ func detectLanguage(repoPath string) (string, error) {
 		"go.mod",
 		"package.json",
 		"requirements.txt",
-		"Cargo.toml",
-		"pom.xml",
+		"setup.py",
+		"pyproject.toml",
 		"build.gradle",
+		"build.gradle.kts",
+		"pom.xml",
+		"Cargo.toml",
 	}
 
 	for _, file := range files {
@@ -160,8 +171,10 @@ func detectLanguage(repoPath string) (string, error) {
 				return "python", nil
 			case "Cargo.toml":
 				return "rust", nil
-			case "pom.xml", "build.gradle":
-				return "java", nil
+			case "pom.xml":
+				return "java_maven", nil
+			case "build.gradle", "build.gradle.kts":
+				return "java_gradle", nil
 			}
 		}
 	}

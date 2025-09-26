@@ -18,9 +18,9 @@ type ProjectInfo struct {
 	HasDockerfile  bool     `json:"has_dockerfile"`
 	HasMakefile    bool     `json:"has_makefile"`
 	Modules        []string `json:"modules"`
-	RepositoryType string   `json:"repository_type"` // "local" или "remote"
+	RepositoryType string   `json:"repository_type"`
 	RemoteURL      string   `json:"remote_url,omitempty"`
-	HasTests       bool     `json:"has_tests"` // ← Добавляем это поле
+	HasTests       bool     `json:"has_tests"`
 }
 
 func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {
@@ -33,8 +33,6 @@ func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {
 		RepositoryType: "remote",
 		RemoteURL:      repoURL,
 	}
-
-	// Определяем язык проекта
 	info.Language = detectLanguageFromMemory(remoteInfo)
 
 	switch info.Language {
@@ -53,7 +51,6 @@ func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {
 	return info, nil
 }
 func detectLanguageFromMemory(remoteInfo *git.RemoteRepoInfo) string {
-	// Проверяем наличие конфигурационных файлов
 	if remoteInfo.HasFile("go.mod") {
 		return "go"
 	}
@@ -97,8 +94,6 @@ func detectLanguageByExtensions(fileList []string) string {
 			}
 		}
 	}
-
-	// Возвращаем язык с наибольшим количеством файлов
 	var maxLang string
 	maxCount := 0
 	for lang, count := range extCount {
@@ -116,8 +111,6 @@ func detectLanguageByExtensions(fileList []string) string {
 
 func AnalyzeLocalRepo(repoPath string) (*ProjectInfo, error) {
 	info := &ProjectInfo{}
-
-	// Определяем язык проекта
 	lang, err := detectLanguage(repoPath)
 	if err != nil {
 		return nil, err

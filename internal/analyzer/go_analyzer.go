@@ -146,7 +146,6 @@ func detectGoDependencies(repoPath string) []string {
 }
 
 func detectArchitecture(repoPath string) string {
-	// Упрощенное определение архитектуры
 	if exists(filepath.Join(repoPath, "cmd")) && exists(filepath.Join(repoPath, "pkg")) {
 		return "standard-go-layout"
 	}

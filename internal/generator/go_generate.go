@@ -81,7 +81,7 @@ jobs:`)
 
 	pipeline.WriteString(`
     - name: Build
-      run: go build -o bin/app main.go
+      run: go build -o bin/app ${{ env.MAIN_PACKAGE_PATH }}
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:

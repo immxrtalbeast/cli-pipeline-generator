@@ -13,6 +13,8 @@ func GeneratePipeline(info *analyzer.ProjectInfo, outputFile string) error {
 	switch info.Language {
 	case "go":
 		pipelineContent = generateGoPipelineActions(info)
+	case "python":
+		pipelineContent = generatePythonPipeline(info)
 	default:
 		return fmt.Errorf("unsupported language: %s", info.Language)
 	}

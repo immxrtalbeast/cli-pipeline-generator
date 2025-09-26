@@ -120,29 +120,33 @@ func AnalyzeLocalRepo(repoPath string) (*ProjectInfo, error) {
 	}
 	info.Language = lang
 
-	// Для Go проектов
 	if lang == "go" {
 		err = analyzeGoProject(repoPath, info)
 		if err != nil {
 			return nil, err
 		}
 	}
+	switch lang {
+	case "python":
+		err = analyzePythonProject(repoPath, info)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	// Определяем архитектуру (упрощенно)
 	info.Architecture = detectArchitecture(repoPath)
 
 	return info, nil
 }
 
 func detectLanguage(repoPath string) (string, error) {
-	// Проверяем наличие специфичных файлов для разных языков
 	files := []string{
-		"go.mod",           // Go
-		"package.json",     // JavaScript
-		"requirements.txt", // Python
-		"Cargo.toml",       // Rust
-		"pom.xml",          // Java Maven
-		"build.gradle",     // Java Gradle
+		"go.mod",
+		"package.json",
+		"requirements.txt",
+		"Cargo.toml",
+		"pom.xml",
+		"build.gradle",
 	}
 
 	for _, file := range files {

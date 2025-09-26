@@ -1,0 +1,157 @@
+package analyzer
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/immxrtalbeast/pipeline-gen/internal/git"
+)
+
+func analyzeGoProjectFromMemory(remoteInfo *git.RemoteRepoInfo, info *ProjectInfo) {
+	info.BuildTool = "go"
+	info.TestFramework = "testing"
+
+	// Читаем go.mod для получения версии
+	if content, exists := remoteInfo.GetFileContent("go.mod"); exists {
+		lines := strings.Split(content, "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "go ") {
+				info.Version = strings.TrimSpace(strings.TrimPrefix(line, "go "))
+				break
+			}
+		}
+	}
+
+	// Анализируем зависимости
+	info.Dependencies = detectGoDependenciesFromMemory(remoteInfo)
+	info.Modules = detectGoModulesFromMemory(remoteInfo)
+
+	for _, file := range remoteInfo.Structure {
+		if strings.HasSuffix(file, "_test.go") {
+			info.HasTests = true
+			break
+		}
+	}
+}
+
+func detectGoDependenciesFromMemory(remoteInfo *git.RemoteRepoInfo) []string {
+	deps := []string{}
+
+	// Анализируем go.mod на наличие популярных зависимостей
+	if content, exists := remoteInfo.GetFileContent("go.mod"); exists {
+		if strings.Contains(content, "github.com/gin-gonic/gin") {
+			deps = append(deps, "web-framework:gin")
+		}
+		if strings.Contains(content, "github.com/gorilla/mux") {
+			deps = append(deps, "web-framework:gorilla")
+		}
+		if strings.Contains(content, "database/sql") || strings.Contains(content, "gorm.io/gorm") {
+			deps = append(deps, "database")
+		}
+	}
+
+	return deps
+}
+
+func detectGoModulesFromMemory(remoteInfo *git.RemoteRepoInfo) []string {
+	modules := []string{}
+
+	// Ищем вложенные go.mod файлы
+	for _, file := range remoteInfo.Structure {
+		if strings.HasSuffix(file, "go.mod") && file != "go.mod" {
+			dir := filepath.Dir(file)
+			modules = append(modules, dir)
+		}
+	}
+
+	return modules
+}
+func detectGoArchitectureFromMemory(remoteInfo *git.RemoteRepoInfo) string {
+	// Определяем архитектуру по структуре каталогов
+	hasCmd := remoteInfo.HasDirectory("cmd")
+	hasPkg := remoteInfo.HasDirectory("pkg")
+	hasInternal := remoteInfo.HasDirectory("internal")
+
+	if hasCmd && hasPkg {
+		return "standard-go-layout"
+	}
+	if hasInternal {
+		return "with-internal-packages"
+	}
+
+	// Проверяем наличие типичных структур
+	for _, file := range remoteInfo.Structure {
+		if strings.Contains(file, "/cmd/") || strings.Contains(file, "/pkg/") {
+			return "standard-go-layout"
+		}
+	}
+
+	return "simple"
+}
+
+//local
+
+func analyzeGoProject(repoPath string, info *ProjectInfo) error {
+	// Читаем go.mod для получения версии и зависимостей
+	goModPath := filepath.Join(repoPath, "go.mod")
+	if exists(goModPath) {
+		content, err := os.ReadFile(goModPath)
+		if err != nil {
+			return err
+		}
+
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "go ") {
+				info.Version = strings.TrimSpace(strings.TrimPrefix(line, "go "))
+			}
+		}
+	}
+
+	info.BuildTool = "go"
+	info.TestFramework = "testing"
+
+	// Простой анализ зависимостей
+	info.Dependencies = detectGoDependencies(repoPath)
+
+	return nil
+}
+
+func detectGoDependencies(repoPath string) []string {
+	deps := []string{}
+
+	// Проверяем наличие common зависимостей через анализ импортов
+	goFiles, _ := filepath.Glob(filepath.Join(repoPath, "*.go"))
+	for _, file := range goFiles {
+		content, err := os.ReadFile(file)
+		if err != nil {
+			continue
+		}
+
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "import") {
+				if strings.Contains(line, "github.com/gin-gonic/gin") {
+					deps = append(deps, "web-framework:gin")
+				}
+				if strings.Contains(line, "database/sql") {
+					deps = append(deps, "database:sql")
+				}
+			}
+		}
+	}
+
+	return deps
+}
+
+func detectArchitecture(repoPath string) string {
+	// Упрощенное определение архитектуры
+	if exists(filepath.Join(repoPath, "cmd")) && exists(filepath.Join(repoPath, "pkg")) {
+		return "standard-go-layout"
+	}
+	if exists(filepath.Join(repoPath, "internal")) {
+		return "with-internal-packages"
+	}
+	return "simple"
+}

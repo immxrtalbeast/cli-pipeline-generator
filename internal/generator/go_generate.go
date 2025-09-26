@@ -18,7 +18,7 @@ on:
   pull_request:
     branches: [ main, master ]
 
-env: 
+env:
 	GO_VERSION:`)
 
 	if info.Version != "" {
@@ -34,15 +34,13 @@ jobs:`)
 		pipeline.WriteString(`
   test:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Go
+	steps:
+	- uses: actions/checkout@v3
+	- name: Set up Go
       uses: actions/setup-go@v3
-      with:
+	with:
         go-version: ${{ env.GO_VERSION }}
-    
-    - name: Download dependencies
+	- name: Download dependencies
       run: go mod download
     
     - name: Run tests

@@ -14,8 +14,6 @@ func analyzeJavaProjectFromMemory(remoteInfo *git.RemoteRepoInfo, info *ProjectI
 	info.Version = detectJavaVersion(remoteInfo)
 	info.Dependencies = detectJavaDependencies(remoteInfo)
 	info.HasTests = detectJavaTestsFromMemory(remoteInfo)
-
-	// Определяем, является ли это Gradle проектом
 	if info.BuildTool == "gradle" {
 		info.Modules = detectGradleModulesFromMemory(remoteInfo)
 	}

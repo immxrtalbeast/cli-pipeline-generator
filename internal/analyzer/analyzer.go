@@ -37,11 +37,6 @@ func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {
 	// Определяем язык проекта
 	info.Language = detectLanguageFromMemory(remoteInfo)
 
-	if info.Language == "go" {
-		analyzeGoProjectFromMemory(remoteInfo, info)
-		info.Architecture = detectGoArchitectureFromMemory(remoteInfo)
-	}
-
 	switch info.Language {
 	case "go":
 		analyzeGoProjectFromMemory(remoteInfo, info)
@@ -137,6 +132,11 @@ func AnalyzeLocalRepo(repoPath string) (*ProjectInfo, error) {
 		}
 	case "go":
 		err = analyzeGoProject(repoPath, info)
+		if err != nil {
+			return nil, err
+		}
+	case "java_gradle", "java_maven":
+		err = analyzeJavaProject(repoPath, info)
 		if err != nil {
 			return nil, err
 		}

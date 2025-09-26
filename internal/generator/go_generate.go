@@ -19,13 +19,15 @@ on:
     branches: [ main, master ]
 
 env:
-	GO_VERSION:`)
+  GO_VERSION:`)
 
 	if info.Version != "" {
-		pipeline.WriteString(fmt.Sprintf(" '%s' ", info.Version))
+		pipeline.WriteString(fmt.Sprintf(" '%s'", info.Version))
 	} else {
-		pipeline.WriteString(" '1.19', '1.20' ")
+		pipeline.WriteString(" '1.19'")
 	}
+	pipeline.WriteString(fmt.Sprintf(`
+  MAIN_PACKAGE_PATH: '%s'`, info.MainFilePath))
 
 	pipeline.WriteString(`
 
@@ -34,15 +36,14 @@ jobs:`)
 		pipeline.WriteString(`
   test:
     runs-on: ubuntu-latest
-	steps:
-	- uses: actions/checkout@v3
-	- name: Set up Go
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Go
       uses: actions/setup-go@v3
-	with:
+      with:
         go-version: ${{ env.GO_VERSION }}
-	- name: Download dependencies
+    - name: Download dependencies
       run: go mod download
-    
     - name: Run tests
       run: go test -v ./...`)
 
@@ -60,23 +61,21 @@ jobs:`)
 	}
 	if info.HasTests {
 		pipeline.WriteString("\n  build:\n    runs-on: ubuntu-latest\n    needs: test\n    steps:")
-
 	} else {
-		pipeline.WriteString("\n  build:\n    runs-on: ubuntu-latest\n		steps:")
-
+		pipeline.WriteString("\n  build:\n    runs-on: ubuntu-latest\n    steps:")
 	}
 
 	pipeline.WriteString(`
-    	- uses: actions/checkout@v3
-    	- name: Set up Go
-     	  uses: actions/setup-go@v3
-		  with:
-			  go-version:`)
+    - uses: actions/checkout@v3
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version:`)
 
 	if info.Version != "" {
-		pipeline.WriteString(fmt.Sprintf(" '%s' ", info.Version))
+		pipeline.WriteString(fmt.Sprintf(" '%s'", info.Version))
 	} else {
-		pipeline.WriteString(" '1.19', '1.20' ")
+		pipeline.WriteString(" '1.19'")
 	}
 
 	pipeline.WriteString(`

@@ -21,6 +21,7 @@ type ProjectInfo struct {
 	RepositoryType string   `json:"repository_type"`
 	RemoteURL      string   `json:"remote_url,omitempty"`
 	HasTests       bool     `json:"has_tests"`
+	MainFilePath   string   `json:"main_file_path"`
 }
 
 func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {

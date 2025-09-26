@@ -7,8 +7,8 @@ on:
     branches: [ main, master ]
 
 env:
-  GO_VERSION: '1.23.6'
-  MAIN_PACKAGE_PATH: 'cmd/main.go'
+  GO_VERSION: '1.24.3'
+  MAIN_PACKAGE_PATH: 'main.go'
 
 jobs:
   build:
@@ -18,7 +18,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: '1.23.6'
+        go-version: '1.24.3'
     - name: Build
       run: go build -o bin/app ${{ env.MAIN_PACKAGE_PATH }}
     - name: Upload artifact

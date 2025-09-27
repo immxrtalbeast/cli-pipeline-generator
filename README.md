@@ -37,3 +37,4 @@ Flags:
   -R, --remote string    URL of remote git repository
   -r, --repo string      Path to local repository
 ```
+Если по указанной в флаге ветке не получиться запуллить, алгоритм попытается ветки: "develop", "main" и "master"

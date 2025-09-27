@@ -23,7 +23,7 @@ pipeline-gen --repo {путь до репозитория} --output {назва�
 ```
 Опциальональный флаг для вида pipeline
 ```
---forman {github/gitlab/jenkins}
+--format {github/gitlab/jenkins}
 ```
 Флаги
 ```

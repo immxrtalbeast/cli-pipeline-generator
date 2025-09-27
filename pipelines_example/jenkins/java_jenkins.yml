@@ -1,0 +1,83 @@
+pipeline {
+    agent any
+    
+    environment {
+        JAVA_VERSION = '11'
+        MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
+    }
+    
+    tools {
+        maven 'Maven 3.8.6'
+        jdk '11'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh './gradlew build'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh './gradlew test'
+                sh './gradlew jacocoTestReport'
+            }
+            post {
+                always {
+                    publishTestResults testResultsPattern: 'target/surefire-reports/*.xml'
+                    publishCoverage adapters: [jacocoAdapter('target/site/jacoco/jacoco.xml')], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
+                }
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh './gradlew bootJar'
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    sshagent(['deploy-ssh-key']) {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER} "
+                                docker pull your-registry.com/your-project:latest
+                                docker stop your-project || true
+                                docker rm your-project || true  
+                                docker run -d --name your-project -p 8080:8080 your-registry.com/your-project:latest
+                            "
+                        """
+                    }
+                }
+            }
+        }
+    }
+}

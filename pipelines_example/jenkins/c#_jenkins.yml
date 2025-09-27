@@ -1,0 +1,67 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOTNET_VERSION = '8.0'
+        DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+    }
+    
+    tools {
+        dotnet '8.0'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Restore') {
+            steps {
+                sh 'dotnet restore'
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'dotnet build --no-restore --configuration Release'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'dotnet test --no-build --configuration Release --logger trx --collect:"XPlat Code Coverage"'
+            }
+            post {
+                always {
+                    publishTestResults testResultsPattern: '**/TestResults/*.trx'
+                    publishCoverage adapters: [coberturaAdapter('**/coverage.cobertura.xml')], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
+                }
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh 'dotnet pack --no-build --configuration Release -o packages'
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'publish/**,packages/**', fingerprint: true
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}

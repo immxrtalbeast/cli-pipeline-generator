@@ -76,6 +76,8 @@ func GeneratePipeline(info *analyzer.ProjectInfo, outputFile string, format stri
 			pipelineContent = generateRustPipeline(info)
 		case "cpp":
 			pipelineContent = generateCppPipeline(info)
+		case "swift":
+			pipelineContent = generateSwiftPipeline(info)
 		default:
 			return fmt.Errorf("unsupported language: %s", info.Language)
 		}
@@ -240,7 +242,7 @@ func addJenkinsDeployStage(pipelineContent string, info *analyzer.ProjectInfo) s
 
 	return pipelineContent + deployStage
 }
-func ProcessRepositoryList(listFile, branch string) error {
+func ProcessRepositoryList(listFile, branch, format string, maxConcurrent int) error {
 	file, err := os.Open(listFile)
 	if err != nil {
 		return fmt.Errorf("failed to open list file: %w", err)
@@ -265,7 +267,6 @@ func ProcessRepositoryList(listFile, branch string) error {
 		return fmt.Errorf("no repositories found in %s", listFile)
 	}
 
-	maxConcurrent := 5
 	semaphore := make(chan struct{}, maxConcurrent)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -288,7 +289,7 @@ func ProcessRepositoryList(listFile, branch string) error {
 			}
 
 			outputFile := fmt.Sprintf("%s.yml", result.RepoName)
-			err = GeneratePipeline(result, outputFile, "github")
+			err = GeneratePipeline(result, outputFile, format)
 			if err != nil {
 				fmt.Printf("❌ [%d/%d] Error generating pipeline for %s: %v\n", index+1, len(repos), url, err)
 				return

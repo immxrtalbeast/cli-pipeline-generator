@@ -13,12 +13,13 @@ import (
 )
 
 var (
-	repoPath   string
-	remoteRepo string
-	branch     string
-	outputFile string
-	format     string
-	listFile   string
+	repoPath      string
+	remoteRepo    string
+	branch        string
+	outputFile    string
+	format        string
+	listFile      string
+	maxConcurrent int
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -44,7 +45,7 @@ var rootCmd = &cobra.Command{
 			}
 			fmt.Println("✓ Repository analyzed successfully in memory")
 		} else if listFile != "" {
-			err := generator.ProcessRepositoryList(listFile, branch)
+			err := generator.ProcessRepositoryList(listFile, branch, format, maxConcurrent)
 			if err != nil {
 				fmt.Printf("Error processing repository list: %v\n", err)
 				os.Exit(1)
@@ -84,4 +85,5 @@ func init() {
 	rootCmd.Flags().StringVarP(&branch, "branch", "b", "main", "Branch to analyze")
 	rootCmd.Flags().StringVarP(&outputFile, "output", "o", "pipeline.yml", "Output pipeline file")
 	rootCmd.Flags().StringVarP(&format, "format", "f", "github", "CI/CD format (github, gitlab, jenkins)")
+	rootCmd.Flags().IntVarP(&maxConcurrent, "concurrent", "c", 10, "Max goroutines")
 }

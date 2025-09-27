@@ -1,0 +1,141 @@
+name: Java CI/CD Pipeline (Gradle)
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+env:
+  DEFAULT_JAVA_VERSION: '11'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: ['11', '17', '21']
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Validate project structure
+      run: |
+        if [ ! -f "build.gradle" ] && [ ! -f "pom.xml" ] && [ ! -f "build.gradle.kts" ]; then
+          echo "❌ No build configuration found (build.gradle, pom.xml, build.gradle.kts)"
+          exit 1
+        fi
+        echo "✅ Build configuration found"
+    
+    - name: Set up JDK ${{ matrix.java-version }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ matrix.java-version }}
+        distribution: 'temurin'
+        cache: 'gradle'
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      
+    - name: Validate Gradle wrapper
+      run: |
+        if [ -f "gradlew" ]; then
+          chmod +x gradlew
+          echo "✅ Using Gradle wrapper"
+        else
+          echo "ℹ️  Using system Gradle"
+        fi
+    - name: Run tests with Gradle
+      run: |
+        if [ -f "gradlew" ]; then
+          ./gradlew test --no-daemon
+        else
+          gradle test --no-daemon
+        fi
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.java-version }}
+        path: |
+          build/reports/tests/
+          target/surefire-reports/
+        retention-days: 7
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.DEFAULT_JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: 'gradle'
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      
+    - name: Validate Gradle wrapper
+      run: |
+        if [ -f "gradlew" ]; then
+          chmod +x gradlew
+          echo "✅ Using Gradle wrapper"
+        else
+          echo "ℹ️  Using system Gradle"
+        fi
+    - name: Build with Gradle
+      run: |
+        if [ -f "gradlew" ]; then
+          ./gradlew build -x test --no-daemon
+        else
+          gradle build -x test --no-daemon
+        fi
+        
+    - name: Verify artifacts existence
+      run: |
+        echo "Checking for artifacts in build/libs/:"
+        ls -la build/libs/ || echo "No artifacts found in build/libs/"
+        find . -name "*.jar" -o -name "*.war" | head -10 || echo "No JAR/WAR files found"
+        
+    - name: Upload JAR artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: java-artifacts
+        path: |
+          build/libs/*.jar
+          build/libs/*.war
+        retention-days: 30
+    - name: Build Spring Boot executable
+      run: |
+        if [ -f "gradlew" ]; then
+          ./gradlew bootJar --no-daemon
+        else
+          gradle bootJar --no-daemon
+        fi
+        
+    - name: Upload Spring Boot JAR
+      uses: actions/upload-artifact@v4
+      with:
+        name: spring-boot-app
+        path: build/libs/*-boot.jar
+        retention-days: 30
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    environment: production
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Deploy to server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_SSH_KEY }}
+        script: |
+          docker pull ${{ secrets.REGISTRY_URL }}/${{ github.repository }}:latest
+          docker stop ${{ github.event.repository.name }} || true
+          docker rm ${{ github.event.repository.name }} || true
+          docker run -d --name ${{ github.event.repository.name }} -p 8080:8080 ${{ secrets.REGISTRY_URL }}/${{ github.repository }}:latest

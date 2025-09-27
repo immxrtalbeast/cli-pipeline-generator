@@ -1,0 +1,54 @@
+name: Go CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+env: 
+  GO_VERSION:  '1.23.6'
+  MAIN_PACKAGE_PATH: 'cmd/main.go'
+   jobs:
+    build:
+      runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Download dependencies
+      run: go mod download
+    - name: Build main package
+      run: |
+        mkdir -p bin
+        go build -o bin/app ${{ env.MAIN_PACKAGE_PATH }}
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: go-binaries
+        path: bin/
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    environment: production
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Deploy to server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_SSH_KEY }}
+        script: |
+          docker pull ${{ secrets.REGISTRY_URL }}/${{ github.repository }}:latest
+          docker stop ${{ github.event.repository.name }} || true
+          docker rm ${{ github.event.repository.name }} || true
+          docker run -d --name ${{ github.event.repository.name }} -p 8080:8080 ${{ secrets.REGISTRY_URL }}/${{ github.repository }}:latest

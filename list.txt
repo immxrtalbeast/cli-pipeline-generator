@@ -2,3 +2,9 @@ https://github.com/immxrtalbeast/flagman-backend
 https://github.com/SidereaH/HomeRepOrderService
 https://github.com/kleget/vk_auto_posting
 https://github.com/realSlimPudge/fux
+https://github.com/aseprite/aseprite
+https://github.com/tauri-apps/tauri
+https://github.com/jekyll/jekyll
+https://github.com/AvaloniaUI/Avalonia
+https://github.com/Alamofire/Alamofire
+https://github.com/laravel/laravel

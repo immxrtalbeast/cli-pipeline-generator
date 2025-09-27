@@ -19,7 +19,7 @@ pipeline-gen --repo {путь до репозитория} --output {назва�
 
 Генерация для нескольких репозиториев(конкуретная обработка)
 ```
- pipeline-gen --list {путь до txt с ссылками на репозитории}
+ pipeline-gen --list {путь до txt с ссылками на репозитории} --concurrent {число макс. горутин}
 ```
 Опциальональный флаг для вида pipeline
 ```
@@ -28,11 +28,12 @@ pipeline-gen --repo {путь до репозитория} --output {назва�
 Флаги
 ```
 Flags:
-  -b, --branch string   Branch to analyze (default "main")
-  -f, --format string   CI/CD format (github, gitlab, jenkins) (default "github")
-  -h, --help            help for pipeline-gen
-  -l, --list string     Path to txt file with links to repositories
-  -o, --output string   Output pipeline file (default "pipeline.yml")
-  -R, --remote string   URL of remote git repository
-  -r, --repo string     Path to local repository
+  -b, --branch string    Branch to analyze (default "main")
+  -c, --concurrent int   Max goroutines (default 10)
+  -f, --format string    CI/CD format (github, gitlab, jenkins) (default "github")
+  -h, --help             help for pipeline-gen
+  -l, --list string      Path to txt file with links to repositories
+  -o, --output string    Output pipeline file (default "pipeline.yml")
+  -R, --remote string    URL of remote git repository
+  -r, --repo string      Path to local repository
 ```

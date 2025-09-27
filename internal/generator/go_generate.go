@@ -53,8 +53,8 @@ env:
       run: go build ./cmd/...
 `)
 		} else {
-			pipeline.WriteString(`    - name: Build all packages
-      run: go build ./...
+			pipeline.WriteString(`    - name: Build main package
+      run: go build ${{ env.MAIN_PACKAGE_PATH }}
 `)
 		}
 
@@ -89,42 +89,11 @@ env:
       run: go mod download
 `)
 
-	if strings.Contains(info.Architecture, "standard-go-layout") {
-		pipeline.WriteString(`    - name: Build all binaries from cmd/
+	pipeline.WriteString(`    - name: Build main package
       run: |
         mkdir -p bin
-        for dir in ./cmd/*/; do
-          if [ -d "$dir" ]; then
-            binary_name=$(basename "$dir")
-            echo "Building $binary_name from $dir"
-            go build -o "bin/${binary_name}" "./cmd/${binary_name}"
-          fi
-        done
+        go build -o bin/app ${{ env.MAIN_PACKAGE_PATH }}
 `)
-	} else {
-		pipeline.WriteString(`    - name: Build using recursive approach
-      run: |
-        mkdir -p bin
-        # Пытаемся найти и собрать main пакеты
-        if [ -f "go.mod" ]; then
-          # Используем go list чтобы найти все main пакеты
-          main_packages=$(go list -f '{{.ImportPath}} {{.Name}}' ./... | grep ' main$' | cut -d' ' -f1)
-          if [ -n "$main_packages" ]; then
-            for pkg in $main_packages; do
-              binary_name=$(basename "$pkg")
-              echo "Building $binary_name from $pkg"
-              go build -o "bin/${binary_name}" "$pkg"
-            done
-          else
-            # Fallback: пытаемся собрать стандартным способом
-            go build -o bin/app ./...
-          fi
-        else
-          # Для проектов без go.mod
-          go build -o bin/app .
-        fi
-`)
-	}
 
 	pipeline.WriteString(`    - name: Upload artifacts
       uses: actions/upload-artifact@v4

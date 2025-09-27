@@ -1,0 +1,72 @@
+pipeline {
+    agent any
+    
+    environment {
+        GO_VERSION = '1.23.6'
+        GOPATH = "${WORKSPACE}"
+        GOCACHE = "${WORKSPACE}/.cache"
+    }
+    
+    tools {
+        go '1.23.6'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Dependencies') {
+            steps {
+                sh 'go mod download'
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'go build -v ./...'
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh 'go build -o app ./...'
+                archiveArtifacts artifacts: 'app', fingerprint: true
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    sshagent(['deploy-ssh-key']) {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER} "
+                                docker pull your-registry.com/your-project:latest
+                                docker stop your-project || true
+                                docker rm your-project || true  
+                                docker run -d --name your-project -p 8080:8080 your-registry.com/your-project:latest
+                            "
+                        """
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,67 @@
+pipeline {
+    agent any
+    
+    environment {
+        RUBY_VERSION = '2.7'
+    }
+    
+    tools {
+        ruby '2.7'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Setup') {
+            steps {
+                sh 'ruby --version'
+                sh 'gem install bundler'
+            }
+        }
+        
+        stage('Dependencies') {
+            steps {
+                sh 'bundle config set --local path vendor/bundle'
+                sh 'bundle install'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'bundle exec rake test'
+            }
+            post {
+                always {
+                    publishTestResults testResultsPattern: 'spec/reports/*.xml'
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'bundle exec rake build'
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'public/assets/**,tmp/cache/**,*.gem,pkg/**', fingerprint: true
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}

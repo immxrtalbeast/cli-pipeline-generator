@@ -24,6 +24,7 @@ type ProjectInfo struct {
 	PackageManager string   `json:"package_manager"`
 	Structure      []string `json:"structure"`
 	RepositoryURL  string   `json:"repository_url"`
+	MainFilePath   string   `json:"main_file_path"`
 }
 
 func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {
@@ -103,7 +104,7 @@ func detectLanguageFromMemory(remoteInfo *git.RemoteRepoInfo) string {
 	if remoteInfo.HasFile("Gemfile") {
 		return "ruby"
 	}
-	if remoteInfo.HasFile(".csproj") || remoteInfo.HasFile(".sln"){
+	if remoteInfo.HasFile(".csproj") || remoteInfo.HasFile(".sln") {
 		return "csharp"
 	}
 	return detectLanguageByExtensions(remoteInfo.Structure)
@@ -129,7 +130,7 @@ func detectLanguageByExtensions(fileList []string) string {
 				extCount["cpp"]++
 			case ".rb", ".rake", ".gemspec":
 				extCount["ruby"]++
-			case ".csproj",".sln":
+			case ".csproj", ".sln":
 				extCount["csharp"]++
 			case ".swift":
 				extCount["swift"]++
@@ -209,7 +210,7 @@ func AnalyzeLocalRepo(repoPath string) (*ProjectInfo, error) {
 	case "php":
 		err = analyzePHPProject(repoPath, info)
 		if err != nil {
-			return nil, err 
+			return nil, err
 		}
 	}
 
@@ -233,7 +234,7 @@ func detectLanguage(repoPath string) (string, error) {
 		"Makefile",
 		"Gemfile",
 		".csproj",
-		".sln",	
+		".sln",
 		"Package.swift",
 		"composer.json",
 		"artisan",

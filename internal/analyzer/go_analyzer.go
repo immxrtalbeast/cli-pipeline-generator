@@ -30,9 +30,93 @@ func analyzeGoProjectFromMemory(remoteInfo *git.RemoteRepoInfo, info *ProjectInf
 	for _, file := range remoteInfo.Structure {
 		if strings.HasSuffix(file, "_test.go") {
 			info.HasTests = true
-			break
+
 		}
 	}
+	info.MainFilePath = findMainFilePathFromMemory(remoteInfo)
+
+}
+
+func findMainFilePathFromMemory(remoteInfo *git.RemoteRepoInfo) string {
+
+	for _, file := range remoteInfo.Structure {
+
+		if strings.HasSuffix(file, "main.go") {
+
+			return file
+
+		}
+
+	}
+
+	for _, file := range remoteInfo.Structure {
+
+		if strings.HasSuffix(file, ".go") && !strings.HasSuffix(file, "_test.go") {
+
+			if content, exists := remoteInfo.GetFileContent(file); exists {
+
+				if containsMainFunction(content) {
+
+					return file
+
+				}
+
+			}
+
+		}
+
+	}
+
+	return ""
+
+}
+
+func containsMainFunction(content string) bool {
+
+	lines := strings.Split(content, "\n")
+
+	inBlockComment := false
+
+	for _, line := range lines {
+
+		line = strings.TrimSpace(line)
+
+		if strings.Contains(line, "/*") {
+
+			inBlockComment = true
+
+		}
+
+		if strings.Contains(line, "*/") {
+
+			inBlockComment = false
+
+			continue
+
+		}
+
+		if inBlockComment {
+
+			continue
+
+		}
+
+		if strings.HasPrefix(line, "//") {
+
+			continue
+
+		}
+
+		if strings.Contains(line, "func main()") {
+
+			return true
+
+		}
+
+	}
+
+	return false
+
 }
 
 func detectGoDependenciesFromMemory(remoteInfo *git.RemoteRepoInfo) []string {
@@ -114,8 +198,77 @@ func analyzeGoProject(repoPath string, info *ProjectInfo) error {
 
 	// Простой анализ зависимостей
 	info.Dependencies = detectGoDependencies(repoPath)
-
+	info.MainFilePath = findMainFilePath(repoPath)
 	return nil
+}
+func findMainFilePath(repoPath string) string {
+
+	mainGoPath := filepath.Join(repoPath, "main.go")
+
+	if exists(mainGoPath) {
+
+		return "main.go"
+
+	}
+
+	var mainFilePath string
+
+	filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
+
+		if err != nil {
+
+			return nil
+
+		}
+
+		if mainFilePath != "" {
+
+			return filepath.SkipAll
+
+		}
+
+		if info.IsDir() || strings.HasSuffix(path, "_test.go") {
+
+			return nil
+
+		}
+
+		if strings.HasSuffix(path, ".go") {
+
+			if strings.HasSuffix(path, "main.go") {
+
+				relPath, _ := filepath.Rel(repoPath, path)
+
+				mainFilePath = relPath
+
+				return filepath.SkipAll
+
+			}
+
+			content, err := os.ReadFile(path)
+
+			if err != nil {
+
+				return nil
+
+			}
+
+			if containsMainFunction(string(content)) {
+
+				relPath, _ := filepath.Rel(repoPath, path)
+
+				mainFilePath = relPath
+
+			}
+
+		}
+
+		return nil
+
+	})
+
+	return mainFilePath
+
 }
 
 func detectGoDependencies(repoPath string) []string {

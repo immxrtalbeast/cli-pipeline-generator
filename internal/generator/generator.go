@@ -77,6 +77,6 @@ func GeneratePipeline(info *analyzer.ProjectInfo, outputFile string, format stri
 			return fmt.Errorf("unsupported language: %s", info.Language)
 		}
 	}
-	fmt.Println(info)
+	fmt.Printf("%s, %s, %s, %s, %s, %s \n", info.Language, info.Version, info.Architecture, info.BuildTool, info.TestFramework, info.PackageManager)
 	return os.WriteFile(outputFile, []byte(pipelineContent), 0644)
 }

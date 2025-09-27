@@ -19,36 +19,35 @@ on:
     branches: [ main, master ]
 
 env: 
-	GO_VERSION: `)
+  GO_VERSION: `)
 
 	if info.Version != "" {
-		pipeline.WriteString(fmt.Sprintf("'%s'\n\n", info.Version))
+		pipeline.WriteString(fmt.Sprintf(" '%s'", info.Version))
 	} else {
-		pipeline.WriteString("'1.21'\n\n")
+		pipeline.WriteString(" '1.19'")
 	}
+	pipeline.WriteString(fmt.Sprintf(`
+  MAIN_PACKAGE_PATH: '%s'`, info.MainFilePath))
 
-	pipeline.WriteString("jobs:\n")
+	pipeline.WriteString(`
+   jobs:`)
 
 	// Job test (если есть тесты)
 	if info.HasTests {
-		pipeline.WriteString(`  test:
+		pipeline.WriteString(`
+  test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    
+    - uses: actions/checkout@v3
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v3
       with:
         go-version: ${{ env.GO_VERSION }}
-    
     - name: Download dependencies
       run: go mod download
-      
     - name: Run tests
-      run: go test -v ./...
-`)
+      run: go test -v ./...`)
 
-		// Дополнительные шаги в зависимости от архитектуры
 		if strings.Contains(info.Architecture, "standard-go-layout") {
 			pipeline.WriteString(`    - name: Build all commands
       run: go build ./cmd/...
@@ -68,8 +67,9 @@ env:
 	}
 
 	// Job build
-	pipeline.WriteString(`  build:
-    runs-on: ubuntu-latest
+	pipeline.WriteString(`
+    build:
+      runs-on: ubuntu-latest
 `)
 
 	// Добавляем зависимость только если есть тесты
@@ -89,9 +89,7 @@ env:
       run: go mod download
 `)
 
-	// Умная логика сборки в зависимости от структуры проекта
 	if strings.Contains(info.Architecture, "standard-go-layout") {
-		// Для стандартной Go структуры с cmd/ папкой
 		pipeline.WriteString(`    - name: Build all binaries from cmd/
       run: |
         mkdir -p bin
@@ -104,7 +102,6 @@ env:
         done
 `)
 	} else {
-		// Универсальный подход для любого проекта
 		pipeline.WriteString(`    - name: Build using recursive approach
       run: |
         mkdir -p bin

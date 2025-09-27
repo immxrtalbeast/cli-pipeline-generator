@@ -1,9 +1,11 @@
 package generator
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/immxrtalbeast/pipeline-gen/internal/analyzer"
 )
@@ -237,4 +239,69 @@ func addJenkinsDeployStage(pipelineContent string, info *analyzer.ProjectInfo) s
 	}
 
 	return pipelineContent + deployStage
+}
+func ProcessRepositoryList(listFile, branch string) error {
+	file, err := os.Open(listFile)
+	if err != nil {
+		return fmt.Errorf("failed to open list file: %w", err)
+	}
+	defer file.Close()
+
+	var repos []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		repoURL := strings.TrimSpace(scanner.Text())
+		if repoURL == "" || strings.HasPrefix(repoURL, "#") {
+			continue
+		}
+		repos = append(repos, repoURL)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading list file: %w", err)
+	}
+
+	if len(repos) == 0 {
+		return fmt.Errorf("no repositories found in %s", listFile)
+	}
+
+	maxConcurrent := 5
+	semaphore := make(chan struct{}, maxConcurrent)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	successCount := 0
+
+	for i, repoURL := range repos {
+		wg.Add(1)
+		semaphore <- struct{}{}
+
+		go func(url string, index int) {
+			defer wg.Done()
+			defer func() { <-semaphore }()
+
+			fmt.Printf("[%d/%d] Processing: %s\n", index+1, len(repos), url)
+
+			result, err := analyzer.AnalyzeRemoteRepo(url, branch)
+			if err != nil {
+				fmt.Printf("❌ [%d/%d] Error analyzing %s: %v\n", index+1, len(repos), url, err)
+				return
+			}
+
+			outputFile := fmt.Sprintf("%s.yml", result.RepoName)
+			err = GeneratePipeline(result, outputFile, "github")
+			if err != nil {
+				fmt.Printf("❌ [%d/%d] Error generating pipeline for %s: %v\n", index+1, len(repos), url, err)
+				return
+			}
+			mu.Lock()
+			successCount++
+			mu.Unlock()
+
+			fmt.Printf("✓ [%d/%d] Pipeline generated: %s\n", index+1, len(repos), outputFile)
+		}(repoURL, i)
+	}
+
+	wg.Wait()
+	fmt.Printf("\n📊 Summary: %d/%d repositories processed successfully\n", successCount, len(repos))
+	return nil
 }

@@ -10,6 +10,7 @@ import (
 
 type ProjectInfo struct {
 	Language       string   `json:"language"`
+	RepoName       string   `json:"repo_name"`
 	Version        string   `json:"version"`
 	Architecture   string   `json:"architecture"`
 	Dependencies   []string `json:"dependencies"`
@@ -32,10 +33,12 @@ func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	parts := strings.Split(repoURL, "/")
 
 	info := &ProjectInfo{
 		RepositoryType: "remote",
 		RemoteURL:      repoURL,
+		RepoName:       parts[len(parts)-1],
 	}
 
 	// Определяем язык проекта

@@ -18,10 +18,12 @@ type ProjectInfo struct {
 	HasDockerfile  bool     `json:"has_dockerfile"`
 	HasMakefile    bool     `json:"has_makefile"`
 	Modules        []string `json:"modules"`
-	RepositoryType string   `json:"repository_type"`
+	RepositoryType string   `json:"repository_type"` // "local" или "remote"
 	RemoteURL      string   `json:"remote_url,omitempty"`
-	HasTests       bool     `json:"has_tests"`
-	MainFilePath   string   `json:"main_file_path"`
+	HasTests       bool     `json:"has_tests"` // ← Добавляем это поле
+	PackageManager string   `json:"package_manager"`
+	Structure      []string `json:"structure"`
+	RepositoryURL  string   `json:"repository_url"`
 }
 
 func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {
@@ -34,7 +36,14 @@ func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {
 		RepositoryType: "remote",
 		RemoteURL:      repoURL,
 	}
+
+	// Определяем язык проекта
 	info.Language = detectLanguageFromMemory(remoteInfo)
+
+	if info.Language == "go" {
+		analyzeGoProjectFromMemory(remoteInfo, info)
+		info.Architecture = detectGoArchitectureFromMemory(remoteInfo)
+	}
 
 	switch info.Language {
 	case "go":
@@ -44,7 +53,20 @@ func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {
 		analyzePythonProjectFromMemory(remoteInfo, info)
 	case "java_gradle", "java_maven":
 		analyzeJavaProjectFromMemory(remoteInfo, info)
-
+	case "rust":
+		analyzeRustProjectFromMemory(remoteInfo, info)
+	case "cpp":
+		analyzeCppProjectFromMemory(remoteInfo, info)
+	case "javascript":
+		analyzeJavaScriptProjectFromMemory(remoteInfo, info)
+	case "ruby":
+		analyzeRubyProjectFromMemory(remoteInfo, info)
+	case "csharp":
+		analyzeCSharpProjectFromMemory(remoteInfo, info)
+	case "swift":
+		analyzeSwiftProjectFromMemory(remoteInfo, info)
+	case "php":
+		analyzePHPProjectFromMemory(remoteInfo, info)
 	}
 	info.HasDockerfile = remoteInfo.HasFile("Dockerfile")
 	info.HasMakefile = remoteInfo.HasFile("Makefile")
@@ -52,6 +74,7 @@ func AnalyzeRemoteRepo(repoURL, branch string) (*ProjectInfo, error) {
 	return info, nil
 }
 func detectLanguageFromMemory(remoteInfo *git.RemoteRepoInfo) string {
+	// Проверяем наличие конфигурационных файлов
 	if remoteInfo.HasFile("go.mod") {
 		return "go"
 	}
@@ -70,6 +93,18 @@ func detectLanguageFromMemory(remoteInfo *git.RemoteRepoInfo) string {
 	}
 	if remoteInfo.HasFile("pom.xml") {
 		return "java_maven"
+	}
+	if remoteInfo.HasFile("CMakeLists.txt") {
+		return "cpp"
+	}
+	if remoteInfo.HasFile("Makefile") {
+		return "cpp"
+	}
+	if remoteInfo.HasFile("Gemfile") {
+		return "ruby"
+	}
+	if remoteInfo.HasFile(".csproj") || remoteInfo.HasFile(".sln"){
+		return "csharp"
 	}
 	return detectLanguageByExtensions(remoteInfo.Structure)
 }
@@ -91,10 +126,20 @@ func detectLanguageByExtensions(fileList []string) string {
 			case ".java":
 				extCount["java"]++
 			case ".cpp", ".c", ".h", ".hpp":
-				extCount["c++"]++
+				extCount["cpp"]++
+			case ".rb", ".rake", ".gemspec":
+				extCount["ruby"]++
+			case ".csproj",".sln":
+				extCount["csharp"]++
+			case ".swift":
+				extCount["swift"]++
+			case ".php":
+				extCount["php"]++
 			}
 		}
 	}
+
+	// Возвращаем язык с наибольшим количеством файлов
 	var maxLang string
 	maxCount := 0
 	for lang, count := range extCount {
@@ -112,6 +157,8 @@ func detectLanguageByExtensions(fileList []string) string {
 
 func AnalyzeLocalRepo(repoPath string) (*ProjectInfo, error) {
 	info := &ProjectInfo{}
+
+	// Определяем язык проекта
 	lang, err := detectLanguage(repoPath)
 	if err != nil {
 		return nil, err
@@ -129,10 +176,40 @@ func AnalyzeLocalRepo(repoPath string) (*ProjectInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-	case "java_gradle", "java_maven":
-		err = analyzeJavaProject(repoPath, info)
+	case "rust":
+		err = analyzeRustProject(repoPath, info)
 		if err != nil {
 			return nil, err
+		}
+	case "cpp":
+		err = analyzeCppProject(repoPath, info)
+		if err != nil {
+			return nil, err
+		}
+	case "javascript":
+		err = analyzeJavaScriptProject(repoPath, info)
+		if err != nil {
+			return nil, err
+		}
+	case "ruby":
+		err = analyzeRubyProject(repoPath, info)
+		if err != nil {
+			return nil, err
+		}
+	case "csharp":
+		err = analyzeCSharpProject(repoPath, info)
+		if err != nil {
+			return nil, err
+		}
+	case "swift":
+		err = analyzeSwiftProject(repoPath, info)
+		if err != nil {
+			return nil, err
+		}
+	case "php":
+		err = analyzePHPProject(repoPath, info)
+		if err != nil {
+			return nil, err 
 		}
 	}
 
@@ -152,6 +229,16 @@ func detectLanguage(repoPath string) (string, error) {
 		"build.gradle.kts",
 		"pom.xml",
 		"Cargo.toml",
+		"CMakeLists.txt",
+		"Makefile",
+		"Gemfile",
+		".csproj",
+		".sln",	
+		"Package.swift",
+		"composer.json",
+		"artisan",
+		"symfony",
+		"index.php",
 	}
 
 	for _, file := range files {
@@ -169,6 +256,16 @@ func detectLanguage(repoPath string) (string, error) {
 				return "java_maven", nil
 			case "build.gradle", "build.gradle.kts":
 				return "java_gradle", nil
+			case "CMakeLists.txt", "Makefile":
+				return "cpp", nil
+			case "Gemfile":
+				return "ruby", nil
+			case ".csproj", ".sln":
+				return "csharp", nil
+			case "Package.swift":
+				return "swift", nil
+			case "composer.json", "arisan", "symfony", "index.php":
+				return "php", nil
 			}
 		}
 	}

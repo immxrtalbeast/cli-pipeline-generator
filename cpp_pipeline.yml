@@ -1,0 +1,90 @@
+name: C++ CI/CD Pipeline (Make)
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  setup:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        build_type: [Debug, Release]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake g++ make
+      if: matrix.os == 'ubuntu-latest'
+    - name: Configure
+      run: ./configure
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Build
+      run: make -j$(nproc)
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install analysis tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-tidy cppcheck
+    - name: Run cppcheck
+      run: cppcheck --enable=all --inconclusive --std=c++${{ env.CPP_STANDARD }} src/ include/
+    - name: Run clang-tidy
+      run: |
+        find src/ include/ -name '*.cpp' -o -name '*.h' | xargs clang-tidy -p build/
+      if: env.BUILD_TOOL == 'cmake'
+  build-release:
+    runs-on: ${{ matrix.os }}
+    needs: setup
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install compiler
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake g++-11
+      if: matrix.os == 'ubuntu-latest'
+    - name: Build Release
+      run: make -j$(nproc) CXX=g++-11 CXXFLAGS="-O3 -DNDEBUG"
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: cpp-${{ matrix.os }}-release
+        path: |
+          build/**
+          *.exe
+          *.dll
+          *.so
+          *.dylib
+  format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install clang-format
+      run: sudo apt-get install -y clang-format
+    - name: Check code format
+      run: |
+        find src/ include/ -name '*.cpp' -o -name '*.h' | xargs clang-format -i --dry-run -Werror
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Doxygen
+      run: sudo apt-get install -y doxygen graphviz
+    - name: Generate documentation
+      run: doxygen Doxyfile
+      if: exists('Doxyfile')
+    - name: Upload documentation
+      uses: actions/upload-artifact@v3
+      with:
+        name: cpp-docs
+        path: docs/

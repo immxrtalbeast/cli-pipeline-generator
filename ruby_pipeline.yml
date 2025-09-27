@@ -1,0 +1,64 @@
+name: Ruby CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '2.7'
+        bundler-cache: true
+    - name: Install dependencies
+      run: bundle install
+  test:
+    runs-on: ubuntu-latest
+    needs: install
+    strategy:
+      matrix:
+        ruby-version: [ '2.6', '2.7', '3.0' ]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup Ruby ${{ matrix.ruby-version }}
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby-version }}
+        bundler-cache: true
+    - name: Install dependencies
+      run: bundle install
+    - name: Run tests
+      run: bundle exec rspec
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '2.7'
+        bundler-cache: true
+    - name: Install dependencies
+      run: bundle install
+    - name: Build application
+      run: bundle exec rake build
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-files
+        path: |
+          dist/
+          build/

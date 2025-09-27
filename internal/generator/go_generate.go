@@ -18,81 +18,130 @@ on:
   pull_request:
     branches: [ main, master ]
 
-env:
-  GO_VERSION:`)
+env: 
+	GO_VERSION: `)
 
 	if info.Version != "" {
-		pipeline.WriteString(fmt.Sprintf(" '%s'", info.Version))
+		pipeline.WriteString(fmt.Sprintf("'%s'\n\n", info.Version))
 	} else {
-		pipeline.WriteString(" '1.19'")
+		pipeline.WriteString("'1.21'\n\n")
 	}
-	pipeline.WriteString(fmt.Sprintf(`
-  MAIN_PACKAGE_PATH: '%s'`, info.MainFilePath))
 
-	pipeline.WriteString(`
+	pipeline.WriteString("jobs:\n")
 
-jobs:`)
+	// Job test (если есть тесты)
 	if info.HasTests {
-		pipeline.WriteString(`
-  test:
+		pipeline.WriteString(`  test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+    
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
+    
     - name: Download dependencies
       run: go mod download
+      
     - name: Run tests
-      run: go test -v ./...`)
+      run: go test -v ./...
+`)
 
-		// Добавляем шаги в зависимости от архитектуры
+		// Дополнительные шаги в зависимости от архитектуры
 		if strings.Contains(info.Architecture, "standard-go-layout") {
-			pipeline.WriteString("\n    - name: Build commands\n      run: go build ./cmd/...")
+			pipeline.WriteString(`    - name: Build all commands
+      run: go build ./cmd/...
+`)
 		} else {
-			pipeline.WriteString("\n    - name: Build\n      run: go build -v ./...")
+			pipeline.WriteString(`    - name: Build all packages
+      run: go build ./...
+`)
 		}
 
 		// Добавляем линтеры если нужно
 		if containsDependency(info.Dependencies, "web-framework") {
-			pipeline.WriteString("\n    - name: Security scan\n      run: go vet ./...")
+			pipeline.WriteString(`    - name: Security scan
+      run: go vet ./...
+`)
 		}
 	}
+
+	// Job build
+	pipeline.WriteString(`  build:
+    runs-on: ubuntu-latest
+`)
+
+	// Добавляем зависимость только если есть тесты
 	if info.HasTests {
-		pipeline.WriteString("\n  build:\n    runs-on: ubuntu-latest\n    needs: test\n    steps:")
-	} else {
-		pipeline.WriteString("\n  build:\n    runs-on: ubuntu-latest\n    steps:")
+		pipeline.WriteString("    needs: test\n")
 	}
 
-	pipeline.WriteString(`
-    - uses: actions/checkout@v3
+	pipeline.WriteString(`    steps:
+    - uses: actions/checkout@v4
+    
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
-        go-version:`)
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Download dependencies
+      run: go mod download
+`)
 
-	if info.Version != "" {
-		pipeline.WriteString(fmt.Sprintf(" '%s'", info.Version))
+	// Умная логика сборки в зависимости от структуры проекта
+	if strings.Contains(info.Architecture, "standard-go-layout") {
+		// Для стандартной Go структуры с cmd/ папкой
+		pipeline.WriteString(`    - name: Build all binaries from cmd/
+      run: |
+        mkdir -p bin
+        for dir in ./cmd/*/; do
+          if [ -d "$dir" ]; then
+            binary_name=$(basename "$dir")
+            echo "Building $binary_name from $dir"
+            go build -o "bin/${binary_name}" "./cmd/${binary_name}"
+          fi
+        done
+`)
 	} else {
-		pipeline.WriteString(" '1.19'")
+		// Универсальный подход для любого проекта
+		pipeline.WriteString(`    - name: Build using recursive approach
+      run: |
+        mkdir -p bin
+        # Пытаемся найти и собрать main пакеты
+        if [ -f "go.mod" ]; then
+          # Используем go list чтобы найти все main пакеты
+          main_packages=$(go list -f '{{.ImportPath}} {{.Name}}' ./... | grep ' main$' | cut -d' ' -f1)
+          if [ -n "$main_packages" ]; then
+            for pkg in $main_packages; do
+              binary_name=$(basename "$pkg")
+              echo "Building $binary_name from $pkg"
+              go build -o "bin/${binary_name}" "$pkg"
+            done
+          else
+            # Fallback: пытаемся собрать стандартным способом
+            go build -o bin/app ./...
+          fi
+        else
+          # Для проектов без go.mod
+          go build -o bin/app .
+        fi
+`)
 	}
 
-	pipeline.WriteString(`
-    - name: Build
-      run: go build -o bin/app ${{ env.MAIN_PACKAGE_PATH }}
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
+	pipeline.WriteString(`    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
       with:
-        name: app-binary
-        path: bin/app`)
+        name: go-binaries
+        path: bin/
+`)
 
 	return pipeline.String()
 }
 
 func containsDependency(deps []string, depType string) bool {
 	for _, dep := range deps {
-		if strings.HasPrefix(dep, depType) {
+		if strings.Contains(dep, depType) {
 			return true
 		}
 	}

@@ -16,12 +16,18 @@ pipeline-gen --remote {ссылка на репу} --branch {ветка репо
 ```
 pipeline-gen --repo {путь до репозитория} --output {название файла для пайплана.yml}
 ```
+
+Генерация для нескольких репозиториев(конкуретная обработка)
+```
+ pipeline-gen --list {путь до txt с ссылками на репозитории}
+```
 Флаги
 ```
 Flags:
   -b, --branch string   Branch to analyze (default "main")
   -f, --format string   CI/CD format (github, gitlab, jenkins) (default "github")
   -h, --help            help for pipeline-gen
+  -l, --list string     Path to txt file with links to repositories
   -o, --output string   Output pipeline file (default "pipeline.yml")
   -R, --remote string   URL of remote git repository
   -r, --repo string     Path to local repository
